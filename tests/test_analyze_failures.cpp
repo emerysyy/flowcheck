@@ -180,7 +180,8 @@ int main() {
     std::cout << "FlowCheck 域名提取失败分析" << std::endl;
     std::cout << "========================================\n" << std::endl;
 
-    std::string dataDir = "/Users//Documents/work/flowcheck/data";
+    // 使用相对于 build 目录的路径
+    std::string dataDir = "../data";
 
     std::vector<FlowResult> allResults;
     std::vector<FlowResult> failedResults;

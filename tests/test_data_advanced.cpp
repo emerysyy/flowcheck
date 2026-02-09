@@ -230,7 +230,8 @@ int main() {
     std::cout << "FlowCheck 高级数据测试程序" << std::endl;
     std::cout << "========================================\n" << std::endl;
 
-    std::string dataDir = "/Users//Documents/work/flowcheck/data";
+    // 使用相对于 build 目录的路径
+    std::string dataDir = "../data";
     Statistics stats;
 
     // 测试所有 UDP 流

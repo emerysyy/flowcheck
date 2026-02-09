@@ -2,7 +2,10 @@
 
 # 删除没有 TX_*.bin 文件的流目录
 
-DATA_DIR="/Users//Documents/work/flowcheck/data"
+# 获取脚本所在目录的父目录（项目根目录）
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+DATA_DIR="$PROJECT_ROOT/data"
 
 echo "开始删除无效目录..."
 echo "========================================"

@@ -218,7 +218,8 @@ int main(int argc __attribute__((unused)), char* argv[] __attribute__((unused)))
     std::cout << "FlowCheck 数据测试程序" << std::endl;
     std::cout << "使用 data/ 目录下的真实流数据进行测试" << std::endl;
 
-    std::string dataDir = "/Users//Documents/work/flowcheck/data";
+    // 使用相对于 build 目录的路径
+    std::string dataDir = "../data";
 
     // 测试几个不同类型的流
     std::vector<std::string> testFlows = {
