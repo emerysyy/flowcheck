@@ -1,0 +1,46 @@
+# 编译输出
+build/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+data/
+
+# 测试输出
+*.log
+*.tmp
+
+# 调试文件
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# 依赖
+.deps/
+.libs/
+
+# 其他
+*.bak
+*.orig
+
+# AI
+.claude/
