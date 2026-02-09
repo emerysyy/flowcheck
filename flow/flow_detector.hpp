@@ -10,6 +10,7 @@
 #define flow_detector_hpp
 
 #include <stdio.h>
+#include <optional>
 #include "flow_defines.h"
 #include "../protocol/protocol.h"
 

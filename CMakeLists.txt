@@ -102,6 +102,10 @@ target_link_libraries(test_dns_parse dns_lib)
 add_executable(test_diagnose tests/test_diagnose.cpp)
 target_link_libraries(test_diagnose flow_lib dns_lib protocol_lib)
 
+# Test PCAP file parsing
+add_executable(test_pcap tests/test_pcap.cpp)
+target_link_libraries(test_pcap flow_lib dns_lib protocol_lib)
+
 # Install targets
 install(TARGETS dns_lib protocol_lib flow_lib
     ARCHIVE DESTINATION lib
