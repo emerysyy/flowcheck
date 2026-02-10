@@ -36,34 +36,78 @@ DNSEngine& FlowEngine::getDNSEngine() {
     return *dns_engine_;
 }
 
-void FlowEngine::flowArrive(FlowContext& ctx) {
+// 尝试补全域名信息（仅从 DNS 缓存）
+bool FlowEngine::tryResolveDomain(FlowContext& ctx) {
+    // 如果已经有域名，不需要再补全
+    if (ctx.hasDomain()) {
+        return false;
+    }
 
-    // DNS 流量
-    {
-        if (ctx.isDNS()) {
-            // DNS 流量在 flowSend/flowRecv 中单独处理
-            // 默认允许 DNS
-            ctx.flow_decision = FlowDecision::Allow;
-            ctx.path_decision = PathType::Local;
-            return;
+    // 从 DNS 缓存中查询目标 IP 对应的域名
+    if (ctx.dst_ip.isV4()) {
+        // 使用缓存的 IP 字符串
+        auto cached_domains = dns_engine_->getDomainsForIP(ctx.getIPStringRaw());
+        if (!cached_domains.empty()) {
+            // 从 DNS 缓存中找到了域名
+            ctx.addDomains(cached_domains);
+            return true;  // 新获得了域名
         }
+    }
 
+    return false;  // 没有获得新域名
+}
+
+// 尝试补全域名信息（从 DNS 缓存和数据包）
+bool FlowEngine::tryResolveDomain(FlowContext& ctx, const PacketView& pkt) {
+    // 如果已经有域名，不需要再补全
+    if (ctx.hasDomain()) {
+        return false;
+    }
+
+    // 1. 先尝试从 DNS 缓存查询（调用无参数版本）
+    if (tryResolveDomain(ctx)) {
+        return true;  // DNS 缓存中找到了域名
+    }
+
+    // 2. DNS 缓存中没找到，尝试从数据包中提取域名
+    proto::ProtocolType protocol;
+    auto domain = detector_->extractDomain(ctx, pkt, protocol);
+    if (domain.has_value()) {
+        std::vector<std::string> domains = {domain.value()};
+        ctx.addDomains(domains);
+        return true;  // 新获得了域名
+    }
+
+    return false;  // 没有获得新域名
+}
+
+// 重新评估流量决策
+void FlowEngine::reevaluateDecision(FlowContext& ctx) {
+    // DNS 流量
+    if (ctx.isDNS()) {
+        // DNS 流量默认允许
+        ctx.flow_decision = FlowDecision::Allow;
+        ctx.path_decision = PathType::Local;
+        return;
     }
 
     // 普通流量
-    {
-        if (ctx.hasDomain()) {
-            // 有域名信息，做出流量决策
-            ctx.flow_decision = FlowDecision::Allow;
-            // 做出路径决策
-            ctx.path_decision = PathType::Local;
-        } else {
-            // 还没有域名，允许流量并等待协议检测
-            ctx.flow_decision = FlowDecision::Allow;
-            ctx.path_decision = PathType::Local;
-        }
-        return;
+    if (ctx.hasDomain()) {
+        // 有域名信息，做出流量决策
+        ctx.flow_decision = FlowDecision::Allow;
+        // 做出路径决策
+        ctx.path_decision = PathType::Local;
+    } else {
+        // 还没有域名，允许流量并等待协议检测
+        ctx.flow_decision = FlowDecision::Allow;
+        ctx.path_decision = PathType::Local;
     }
+}
+
+void FlowEngine::flowArrive(FlowContext& ctx) {
+    tryResolveDomain(ctx);
+    // 流量到达时进行初始决策评估
+    reevaluateDecision(ctx);
 }
 
 void FlowEngine::flowOpen(FlowContext& ctx) {
@@ -88,32 +132,10 @@ void FlowEngine::flowSend(FlowContext& ctx, const PacketView& pkt) {
         return;
     }
 
-    // 对于非 DNS 流量，尝试获取域名
-    if (!ctx.hasDomain()) {
-        // 1. 首先从 DNS 缓存中查询目标 IP 对应的域名
-        if (ctx.dst_ip.isV4()) {
-            // 使用缓存的 IP 字符串
-            auto cached_domains = dns_engine_->getDomainsForIP(ctx.getIPStringRaw());
-            if (!cached_domains.empty()) {
-                // 从 DNS 缓存中找到了域名
-                ctx.addDomains(cached_domains);
-
-                // 现在有了域名，重新评估流量决策
-                flowArrive(ctx);
-                return;
-            }
-        }
-
-        // 2. DNS 缓存中没找到，尝试从出站数据包中提取域名
-        proto::ProtocolType protocol;
-        auto domain = detector_->extractDomain(ctx, pkt, protocol);
-        if (domain.has_value()) {
-            std::vector<std::string> domains = {domain.value()};
-            ctx.addDomains(domains);
-
-            // 现在有了域名，重新评估流量决策
-            flowArrive(ctx);
-        }
+    // 对于非 DNS 流量，尝试补全域名
+    if (tryResolveDomain(ctx, pkt)) {
+        // 新获得了域名，重新评估流量决策
+        reevaluateDecision(ctx);
     }
 }
 
@@ -128,32 +150,10 @@ bool FlowEngine::flowSend(FlowContext& ctx, const PacketView& pkt, PacketView& r
         return dns_engine_->handleQuery(ctx, pkt, response);
     }
 
-    // 对于非 DNS 流量，尝试获取域名
-    if (!ctx.hasDomain()) {
-        // 1. 首先从 DNS 缓存中查询目标 IP 对应的域名
-        if (ctx.dst_ip.isV4()) {
-            // 使用缓存的 IP 字符串
-            auto cached_domains = dns_engine_->getDomainsForIP(ctx.getIPStringRaw());
-            if (!cached_domains.empty()) {
-                // 从 DNS 缓存中找到了域名
-                ctx.addDomains(cached_domains);
-
-                // 现在有了域名，重新评估流量决策
-                flowArrive(ctx);
-                return false;
-            }
-        }
-
-        // 2. DNS 缓存中没找到，尝试从出站数据包中提取域名
-        proto::ProtocolType protocol;
-        auto domain = detector_->extractDomain(ctx, pkt, protocol);
-        if (domain.has_value()) {
-            std::vector<std::string> domains = {domain.value()};
-            ctx.addDomains(domains);
-
-            // 现在有了域名，重新评估流量决策
-            flowArrive(ctx);
-        }
+    // 对于非 DNS 流量，尝试补全域名
+    if (tryResolveDomain(ctx, pkt)) {
+        // 新获得了域名，重新评估流量决策
+        reevaluateDecision(ctx);
     }
 
     return false;  // 非 DNS 流量没有响应
@@ -170,18 +170,10 @@ void FlowEngine::flowRecv(FlowContext& ctx, const PacketView& pkt) {
         return;
     }
 
-    // 对于非 DNS 流量，尝试从入站数据包中提取域名
-    if (!ctx.hasDomain()) {
-        proto::ProtocolType protocol;
-
-        auto domain = detector_->extractDomain(ctx, pkt, protocol);
-        if (domain.has_value()) {
-            std::vector<std::string> domains = {domain.value()};
-            ctx.addDomains(domains);
-
-            // 现在有了域名，重新评估流量决策
-            flowArrive(ctx);
-        }
+    // 对于非 DNS 流量，尝试补全域名
+    if (tryResolveDomain(ctx, pkt)) {
+        // 新获得了域名，重新评估流量决策
+        reevaluateDecision(ctx);
     }
 }
 

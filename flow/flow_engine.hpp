@@ -92,6 +92,41 @@ private:
     FlowEngine();
     ~FlowEngine();
 
+    /**
+     * 尝试补全域名信息（仅从 DNS 缓存）
+     *
+     * 从 DNS 缓存中通过目标 IP 查询域名。
+     * 用于流量到达时（还没有数据包）的域名补全。
+     *
+     * @param ctx 流量上下文
+     * @return true 表示新获得了域名，false 表示没有新域名或已有域名
+     */
+    bool tryResolveDomain(FlowContext& ctx);
+
+    /**
+     * 尝试补全域名信息（从 DNS 缓存和数据包）
+     *
+     * 从以下来源尝试获取域名：
+     * 1. DNS 缓存（通过目标 IP 查询）
+     * 2. 数据包协议解析（HTTP、TLS 等）
+     *
+     * @param ctx 流量上下文
+     * @param pkt 数据包（用于协议解析）
+     * @return true 表示新获得了域名，false 表示没有新域名或已有域名
+     */
+    bool tryResolveDomain(FlowContext& ctx, const PacketView& pkt);
+
+    /**
+     * 重新评估流量决策
+     *
+     * 当域名或其他属性发生变化时调用，重新计算：
+     * - flow_decision（允许/阻止）
+     * - path_decision（本地/代理）
+     *
+     * @param ctx 流量上下文
+     */
+    void reevaluateDecision(FlowContext& ctx);
+
     std::unique_ptr<DNSEngine> dns_engine_;  // DNS 引擎
     std::unique_ptr<Detector> detector_;     // 协议检测器
 };

@@ -62,7 +62,7 @@ struct FlowIP
 
     union
     {
-        uint32_t v4; // network byte order
+        uint32_t v4;
         struct
         {
             uint64_t hi;
@@ -140,6 +140,31 @@ public:
 
 };
 
+}
+
+namespace std {
+    template<>
+    struct hash<flow::FlowIP> {
+        size_t operator()(const flow::FlowIP &ip) const {
+            size_t h = std::hash<uint8_t>{}(static_cast<uint8_t>(ip.kind));
+
+            switch (ip.kind) {
+            case flow::FlowIP::Kind::V4:
+                h ^= std::hash<uint32_t>{}(ip.v4) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+                break;
+
+            case flow::FlowIP::Kind::V6:
+                h ^= std::hash<uint64_t>{}(ip.v6.hi) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+                h ^= std::hash<uint64_t>{}(ip.v6.lo) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+                break;
+
+            default:
+                break;
+            }
+
+            return h;
+        }
+    };
 }
 
 #endif /* flow_defines_h */
